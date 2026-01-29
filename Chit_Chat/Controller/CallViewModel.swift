@@ -8,9 +8,11 @@ class CallViewModel: ObservableObject {
     private let webRTCClient = WebRTCClient()
     
     @Published var status = "Disconnected"
-    @Published var hasIncomingCall = false // New flag to show/hide button
+    @Published var hasIncomingCall = false
     
-    private var pendingOffer: RTCSessionDescription? // Store the offer here
+    private var pendingOffer: RTCSessionDescription?
+    // Buffer for candidates arriving before remote description is set
+    private var remoteCandidatesBuffer: [RTCIceCandidate] = []
     
     init() {
         signalingClient.delegate = self
@@ -23,35 +25,56 @@ class CallViewModel: ObservableObject {
     }
     
     func startCall() {
-        print("Starting Call...")
         status = "Calling..."
         webRTCClient.offer { [weak self] sdp in
             self?.signalingClient.send(sdp: sdp)
         }
     }
     
-    // New Function: Called when user taps "Answer" button
     func answerCall() {
         guard let offer = pendingOffer else { return }
-        
-        status = "Connecting Audio..."
         hasIncomingCall = false
+        status = "Connecting Audio..."
         
-        // 1. Apply the stored Offer to WebRTC
         webRTCClient.set(remoteSdp: offer) { [weak self] error in
-            if let error = error { print("Error setting remote SDP: \(error)"); return }
+            guard let self = self else { return }
+            if let error = error {
+                print("Error setting remote SDP: \(error)")
+                return
+            }
             
-            // 2. Generate the Answer
-            self?.webRTCClient.answer { answerSdp in
-                // 3. Send Answer to Server
-                self?.signalingClient.send(sdp: answerSdp)
-                DispatchQueue.main.async { self?.status = "In Call" }
+            // Apply any buffered candidates now that remote description is set
+            self.drainRemoteCandidates()
+            
+            self.webRTCClient.answer { answerSdp in
+                self.signalingClient.send(sdp: answerSdp)
+                DispatchQueue.main.async { self.status = "Audio Connected!" }
             }
         }
     }
+    
+    func endCall() {
+        webRTCClient.close()
+        // Reset connection for next time
+        webRTCClient.setupPeerConnection()
+        remoteCandidatesBuffer.removeAll()
+        pendingOffer = nil
+        
+        DispatchQueue.main.async {
+            self.status = "Server Connected"
+            self.hasIncomingCall = false
+        }
+    }
+    
+    private func drainRemoteCandidates() {
+        for candidate in remoteCandidatesBuffer {
+            webRTCClient.set(remoteCandidate: candidate)
+        }
+        remoteCandidatesBuffer.removeAll()
+    }
 }
 
-// MARK: - Handle Signaling Events
+// MARK: - Signaling Delegate
 extension CallViewModel: SignalingClientDelegate {
     func signalingClientDidConnect(_ client: SignalingClient) {
         DispatchQueue.main.async { self.status = "Server Connected" }
@@ -63,24 +86,29 @@ extension CallViewModel: SignalingClientDelegate {
     
     func signalingClient(_ client: SignalingClient, didReceiveRemoteSdp sdp: RTCSessionDescription) {
         if sdp.type == .offer {
-            // STOP! Don't answer yet. Just save it and show the button.
-            print("Received Offer! Waiting for user to answer...")
             self.pendingOffer = sdp
             DispatchQueue.main.async {
-                self.status = "Incoming Call..."
                 self.hasIncomingCall = true
+                self.status = "Incoming Call..."
             }
         } else if sdp.type == .answer {
-            // If it's an answer, we are the caller, so just connect.
-            webRTCClient.set(remoteSdp: sdp) { _ in }
+            // We are the caller, we received an answer
+            webRTCClient.set(remoteSdp: sdp) { [weak self] error in
+                if error == nil {
+                    self?.drainRemoteCandidates()
+                    DispatchQueue.main.async { self?.status = "Audio Connected!" }
+                }
+            }
         }
     }
     
     func signalingClient(_ client: SignalingClient, didReceiveCandidate candidate: RTCIceCandidate) {
+        // Just try setting it immediately. WebRTC is robust enough usually.
         webRTCClient.set(remoteCandidate: candidate)
     }
 }
 
+// MARK: - WebRTC Delegate
 extension CallViewModel: WebRTCClientDelegate {
     func webRTCClient(_ client: WebRTCClient, didGenerate candidate: RTCIceCandidate) {
         signalingClient.send(candidate: candidate)
@@ -89,9 +117,10 @@ extension CallViewModel: WebRTCClientDelegate {
     func webRTCClient(_ client: WebRTCClient, didChangeConnectionState state: RTCIceConnectionState) {
         DispatchQueue.main.async {
             switch state {
-            case .connected: self.status = "Audio Connected!"
+            case .connected, .completed: self.status = "Audio Connected!"
             case .disconnected: self.status = "Audio Disconnected"
             case .failed: self.status = "Connection Failed"
+            case .closed: self.status = "Call Ended"
             default: break
             }
         }

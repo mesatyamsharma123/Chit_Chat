@@ -8,12 +8,9 @@ protocol WebRTCClientDelegate: AnyObject {
 
 class WebRTCClient: NSObject {
     
-    // The Factory creates connections
     private static let factory: RTCPeerConnectionFactory = {
         RTCInitializeSSL()
-        let videoEncoderFactory = RTCDefaultVideoEncoderFactory()
-        let videoDecoderFactory = RTCDefaultVideoDecoderFactory()
-        return RTCPeerConnectionFactory(encoderFactory: videoEncoderFactory, decoderFactory: videoDecoderFactory)
+        return RTCPeerConnectionFactory()
     }()
     
     private var peerConnection: RTCPeerConnection?
@@ -24,10 +21,9 @@ class WebRTCClient: NSObject {
         setupPeerConnection()
     }
     
-    // MARK: - Setup
-    private func setupPeerConnection() {
+    func setupPeerConnection() {
         let config = RTCConfiguration()
-        // STUN servers let you punch through firewalls
+        // Use Google's public STUN server
         config.iceServers = [RTCIceServer(urlStrings: ["stun:stun.l.google.com:19302"])]
         config.sdpSemantics = .unifiedPlan
         
@@ -43,15 +39,16 @@ class WebRTCClient: NSObject {
         let audioSource = WebRTCClient.factory.audioSource(with: constraints)
         let audioTrack = WebRTCClient.factory.audioTrack(with: audioSource, trackId: "audio0")
         
-        // Add the audio track to the connection
         self.peerConnection?.add(audioTrack, streamIds: ["stream0"])
     }
     
-    // MARK: - Signaling Actions
+    func close() {
+        peerConnection?.close()
+        peerConnection = nil
+    }
     
     func offer(completion: @escaping (RTCSessionDescription) -> Void) {
         let constraints = RTCMediaConstraints(mandatoryConstraints: ["OfferToReceiveAudio": "true"], optionalConstraints: nil)
-        
         peerConnection?.offer(for: constraints, completionHandler: { (sdp, error) in
             guard let sdp = sdp else { return }
             self.peerConnection?.setLocalDescription(sdp, completionHandler: { _ in
@@ -62,7 +59,6 @@ class WebRTCClient: NSObject {
     
     func answer(completion: @escaping (RTCSessionDescription) -> Void) {
         let constraints = RTCMediaConstraints(mandatoryConstraints: ["OfferToReceiveAudio": "true"], optionalConstraints: nil)
-        
         peerConnection?.answer(for: constraints, completionHandler: { (sdp, error) in
             guard let sdp = sdp else { return }
             self.peerConnection?.setLocalDescription(sdp, completionHandler: { _ in
@@ -80,54 +76,22 @@ class WebRTCClient: NSObject {
     }
 }
 
-// MARK: - WebRTC Delegates
-// MARK: - WebRTC Delegates
 extension WebRTCClient: RTCPeerConnectionDelegate {
     
-    // 1. Signaling state changed (Required)
-    func peerConnection(_ peerConnection: RTCPeerConnection, didChange stateChanged: RTCSignalingState) {
-        print("Signaling State Changed: \(stateChanged.rawValue)")
-    }
-    
-    // 2. Media stream added (Required)
-    func peerConnection(_ peerConnection: RTCPeerConnection, didAdd stream: RTCMediaStream) {
-        print("Stream Added")
-    }
-    
-    // 3. Media stream removed (Required)
-    func peerConnection(_ peerConnection: RTCPeerConnection, didRemove stream: RTCMediaStream) {
-        print("Stream Removed")
-    }
-    
-    // 4. Should negotiate (Required)
-    func peerConnectionShouldNegotiate(_ peerConnection: RTCPeerConnection) {
-        print("Should Negotiate")
-    }
-    
-    // 5. ICE Connection state changed (Required & Used)
-    func peerConnection(_ peerConnection: RTCPeerConnection, didChange newState: RTCIceConnectionState) {
-        print("ICE Connection State: \(newState.rawValue)")
-        self.delegate?.webRTCClient(self, didChangeConnectionState: newState)
-    }
-    
-    // 6. ICE Gathering state changed (Required)
-    func peerConnection(_ peerConnection: RTCPeerConnection, didChange newState: RTCIceGatheringState) {
-        print("ICE Gathering State Changed: \(newState.rawValue)")
-    }
-    
-    // 7. Generated ICE Candidate (Required & Used)
     func peerConnection(_ peerConnection: RTCPeerConnection, didGenerate candidate: RTCIceCandidate) {
-        print("Generated Candidate")
         self.delegate?.webRTCClient(self, didGenerate: candidate)
     }
     
-    // 8. Remove ICE Candidates (Required)
-    func peerConnection(_ peerConnection: RTCPeerConnection, didRemove candidates: [RTCIceCandidate]) {
-        print("Removed Candidates")
+    func peerConnection(_ peerConnection: RTCPeerConnection, didChange state: RTCIceConnectionState) {
+        self.delegate?.webRTCClient(self, didChangeConnectionState: state)
     }
     
-    // 9. Data Channel (Required)
-    func peerConnection(_ peerConnection: RTCPeerConnection, didOpen dataChannel: RTCDataChannel) {
-        print("Data Channel Opened")
-    }
+    // Required protocol stubs
+    func peerConnection(_ peerConnection: RTCPeerConnection, didChange signalingState: RTCSignalingState) {}
+    func peerConnection(_ peerConnection: RTCPeerConnection, didAdd stream: RTCMediaStream) {}
+    func peerConnection(_ peerConnection: RTCPeerConnection, didRemove stream: RTCMediaStream) {}
+    func peerConnectionShouldNegotiate(_ peerConnection: RTCPeerConnection) {}
+    func peerConnection(_ peerConnection: RTCPeerConnection, didChange newState: RTCIceGatheringState) {}
+    func peerConnection(_ peerConnection: RTCPeerConnection, didRemove candidates: [RTCIceCandidate]) {}
+    func peerConnection(_ peerConnection: RTCPeerConnection, didOpen dataChannel: RTCDataChannel) {}
 }

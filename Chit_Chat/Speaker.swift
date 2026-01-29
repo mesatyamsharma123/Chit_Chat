@@ -1,8 +1,15 @@
-//
-//  Speaker.swift
-//  Chit_Chat
-//
-//  Created by Satyam Sharma Chingari on 29/01/26.
-//
+import SwiftUI
+import AVFoundation
 
-import Foundation
+/// Configures the AVAudioSession for voice chat use.
+struct AudioSessionConfigurator {
+    static func configure() {
+        let session = AVAudioSession.sharedInstance()
+        do {
+            try session.setCategory(.playAndRecord, mode: .voiceChat, options: [.defaultToSpeaker, .allowBluetooth])
+            try session.setActive(true)
+        } catch {
+            print("Audio Config Error: \(error)")
+        }
+    }
+}

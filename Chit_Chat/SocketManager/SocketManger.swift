@@ -1,10 +1,3 @@
-//
-//  SocketManger.swift
-//  Chit_Chat
-//
-//  Created by Satyam Sharma Chingari on 29/01/26.
-//
-
 import Foundation
 import SocketIO
 import WebRTC
@@ -20,14 +13,13 @@ class SignalingClient {
     private let manager: SocketManager
     private let socket: SocketIOClient
     weak var delegate: SignalingClientDelegate?
-    
-    // Replace with your actual room name logic if needed
     private let roomName = "room1"
 
     init() {
-        // 1. Setup the Socket Manager with your ngrok URL
-        // We use .forceWebsockets(true) to ensure it works smoothly with ngrok
-        let url = URL(string: "https://5d9c1d177d80.ngrok-free.app")!
+        // REPLACE THIS URL WITH YOUR CURRENT NGROK URL
+        let url = URL(string: "https://10b80512764b.ngrok-free.app")!
+        
+        // .forceWebsockets(true) is crucial for stability with ngrok
         self.manager = SocketManager(socketURL: url, config: [.log(true), .compress, .forceWebsockets(true)])
         self.socket = manager.defaultSocket
         
@@ -39,24 +31,18 @@ class SignalingClient {
     }
     
     private func setupListeners() {
-        // Connected to Server
         socket.on(clientEvent: .connect) { [weak self] _, _ in
-            print("✅ Connected to Signaling Server")
+            print("✅ Socket Connected")
             guard let self = self else { return }
             self.delegate?.signalingClientDidConnect(self)
-            
-            // Immediately join the room upon connection
             self.socket.emit("join", self.roomName)
         }
         
-        // Handle "ready" (Both users are in room -> Caller triggers Offer)
-        socket.on("ready") { [weak self] _, _ in
-            print("🚀 Ready to start call")
-            // In a real app, you might use a delegate here to tell the ViewModel to start the Offer
-            // For now, we assume the user triggers it manually or the logic is handled elsewhere
+        socket.on(clientEvent: .disconnect) { [weak self] _, _ in
+            print("❌ Socket Disconnected")
+            self?.delegate?.signalingClientDidDisconnect(self!)
         }
         
-        // Handle Incoming SDP (Offer or Answer)
         socket.on("offer") { [weak self] data, _ in
             self?.handleSdp(data: data, type: .offer)
         }
@@ -65,7 +51,6 @@ class SignalingClient {
             self?.handleSdp(data: data, type: .answer)
         }
         
-        // Handle Incoming ICE Candidate
         socket.on("ice-candidate") { [weak self] data, _ in
             guard let self = self,
                   let dict = data.first as? [String: Any],
@@ -78,7 +63,6 @@ class SignalingClient {
         }
     }
     
-    // Helper to parse SDP
     private func handleSdp(data: [Any], type: RTCSdpType) {
         guard let dict = data.first as? [String: Any],
               let sdp = dict["sdp"] as? String else { return }
@@ -86,8 +70,6 @@ class SignalingClient {
         let sessionDescription = RTCSessionDescription(type: type, sdp: sdp)
         self.delegate?.signalingClient(self, didReceiveRemoteSdp: sessionDescription)
     }
-    
-    // MARK: - Sending Functions
     
     func send(sdp: RTCSessionDescription) {
         let typeString = (sdp.type == .offer) ? "offer" : "answer"

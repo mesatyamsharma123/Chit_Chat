@@ -9,9 +9,14 @@ import SwiftUI
 
 @main
 struct Chit_ChatApp: App {
+    init() {
+        AudioSessionConfigurator.configure()
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()
         }
     }
 }
+
