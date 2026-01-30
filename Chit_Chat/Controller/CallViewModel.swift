@@ -42,8 +42,7 @@ class CallViewModel: ObservableObject {
                 print("Error setting remote SDP: \(error)")
                 return
             }
-            
-            // Apply any buffered candidates now that remote description is set
+      
             self.drainRemoteCandidates()
             
             self.webRTCClient.answer { answerSdp in
@@ -55,7 +54,7 @@ class CallViewModel: ObservableObject {
     
     func endCall() {
         webRTCClient.close()
-        // Reset connection for next time
+        
         webRTCClient.setupPeerConnection()
         remoteCandidatesBuffer.removeAll()
         pendingOffer = nil
@@ -74,7 +73,7 @@ class CallViewModel: ObservableObject {
     }
 }
 
-// MARK: - Signaling Delegate
+
 extension CallViewModel: SignalingClientDelegate {
     func signalingClientDidConnect(_ client: SignalingClient) {
         DispatchQueue.main.async { self.status = "Server Connected" }
@@ -103,12 +102,12 @@ extension CallViewModel: SignalingClientDelegate {
     }
     
     func signalingClient(_ client: SignalingClient, didReceiveCandidate candidate: RTCIceCandidate) {
-        // Just try setting it immediately. WebRTC is robust enough usually.
+    
         webRTCClient.set(remoteCandidate: candidate)
     }
 }
 
-// MARK: - WebRTC Delegate
+
 extension CallViewModel: WebRTCClientDelegate {
     func webRTCClient(_ client: WebRTCClient, didGenerate candidate: RTCIceCandidate) {
         signalingClient.send(candidate: candidate)

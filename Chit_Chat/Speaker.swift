@@ -1,7 +1,7 @@
 import SwiftUI
 import AVFoundation
 
-/// Configures the AVAudioSession for voice chat use.
+
 struct AudioSessionConfigurator {
     static func configure() {
         let session = AVAudioSession.sharedInstance()

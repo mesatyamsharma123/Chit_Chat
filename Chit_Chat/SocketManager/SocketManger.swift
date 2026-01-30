@@ -16,10 +16,9 @@ class SignalingClient {
     private let roomName = "room1"
 
     init() {
-        // REPLACE THIS URL WITH YOUR CURRENT NGROK URL
-        let url = URL(string: "https://10b80512764b.ngrok-free.app")!
-        
-        // .forceWebsockets(true) is crucial for stability with ngrok
+       
+        let url = URL(string: "https://d5042663e928.ngrok-free.app")!
+
         self.manager = SocketManager(socketURL: url, config: [.log(true), .compress, .forceWebsockets(true)])
         self.socket = manager.defaultSocket
         
@@ -32,14 +31,14 @@ class SignalingClient {
     
     private func setupListeners() {
         socket.on(clientEvent: .connect) { [weak self] _, _ in
-            print("✅ Socket Connected")
+            print(" Socket Connected")
             guard let self = self else { return }
             self.delegate?.signalingClientDidConnect(self)
             self.socket.emit("join", self.roomName)
         }
         
         socket.on(clientEvent: .disconnect) { [weak self] _, _ in
-            print("❌ Socket Disconnected")
+            print(" Socket Disconnected")
             self?.delegate?.signalingClientDidDisconnect(self!)
         }
         

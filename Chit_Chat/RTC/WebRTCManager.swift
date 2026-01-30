@@ -86,7 +86,7 @@ extension WebRTCClient: RTCPeerConnectionDelegate {
         self.delegate?.webRTCClient(self, didChangeConnectionState: state)
     }
     
-    // Required protocol stubs
+ 
     func peerConnection(_ peerConnection: RTCPeerConnection, didChange signalingState: RTCSignalingState) {}
     func peerConnection(_ peerConnection: RTCPeerConnection, didAdd stream: RTCMediaStream) {}
     func peerConnection(_ peerConnection: RTCPeerConnection, didRemove stream: RTCMediaStream) {}
