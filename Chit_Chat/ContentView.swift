@@ -13,7 +13,7 @@ struct ContentView: View {
                 
               
                 Text(viewModel.status)
-                    .font(.title2)
+                    .font(.title)
                     .bold()
                     .foregroundColor(.white)
                     .padding()
