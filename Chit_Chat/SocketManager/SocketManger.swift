@@ -17,7 +17,7 @@ class SignalingClient {
 
     init() {
        
-        let url = URL(string: "https://692587a73c47.ngrok-free.app")!
+        let url = URL(string: "https://b6b54f5093e3.ngrok-free.app")!
 
         self.manager = SocketManager(socketURL: url, config: [.log(true), .compress, .forceWebsockets(true)])
         self.socket = manager.defaultSocket
